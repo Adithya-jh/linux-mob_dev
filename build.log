@@ -1,0 +1,171 @@
+  SYNC    include/config/auto.conf.cmd
+  GEN     arch/x86/include/generated/asm/orc_hash.h
+  HOSTCC  scripts/sorttable
+  HOSTCC  scripts/selinux/mdp/mdp
+mkdir -p /home/user/Desktop/linux-mob_dev/tools/objtool && make O=/home/user/Desktop/linux-mob_dev subdir=tools/objtool --no-print-directory -C objtool 
+  UPD     include/config/kernel.release
+  UPD     include/generated/utsrelease.h
+  INSTALL libsubcmd_headers
+  CC      scripts/mod/empty.o
+  CC      scripts/mod/devicetable-offsets.s
+  MKELF   scripts/mod/elfconfig.h
+  HOSTCC  scripts/mod/modpost.o
+  HOSTCC  scripts/mod/sumversion.o
+  HOSTCC  scripts/mod/symsearch.o
+  HOSTCC  scripts/mod/file2alias.o
+  HOSTLD  scripts/mod/modpost
+  CC      kernel/bounds.s
+  UPD     include/generated/bounds.h
+  CC      arch/x86/kernel/asm-offsets.s
+  UPD     include/generated/asm-offsets.h
+  CALL    scripts/checksyscalls.sh
+  LDS     scripts/module.lds
+  CC      init/main.o
+  CC      certs/system_keyring.o
+  CC      ipc/compat.o
+  CC      mm/filemap.o
+  CC      fs/notify/inotify/inotify_fsnotify.o
+  CC      security/keys/gc.o
+  CC      kernel/sched/core.o
+  CC      arch/x86/entry/vdso/vma.o
+  HOSTCC  certs/extract-cert
+In file included from ipc/compat.c:30:
+./include/linux/syscalls.h:34:15: error: expected identifier or ‘(’ before numeric constant
+   34 | struct pollfd;467       common  mobdev_control          sys_mobdev_control
+      |               ^~~
+In file included from init/main.c:21:
+./include/linux/syscalls.h:34:15: error: expected identifier or ‘(’ before numeric constant
+   34 | struct pollfd;467       common  mobdev_control          sys_mobdev_control
+      |               ^~~
+  CC      fs/notify/inotify/inotify_user.o
+In file included from mm/filemap.c:25:
+./include/linux/syscalls.h:34:15: error: expected identifier or ‘(’ before numeric constant
+   34 | struct pollfd;467       common  mobdev_control          sys_mobdev_control
+      |               ^~~
+make[3]: *** [scripts/Makefile.build:194: ipc/compat.o] Error 1
+make[2]: *** [scripts/Makefile.build:440: ipc] Error 2
+make[2]: *** Waiting for unfinished jobs....
+  CC      arch/x86/entry/vsyscall/vsyscall_64.o
+  CC      security/keys/key.o
+In file included from ./include/linux/syscalls_api.h:1,
+                 from kernel/sched/core.c:14:
+./include/linux/syscalls.h:34:15: error: expected identifier or ‘(’ before numeric constant
+   34 | struct pollfd;467       common  mobdev_control          sys_mobdev_control
+      |               ^~~
+  CERT    certs/x509_certificate_list
+  CERT    certs/signing_key.x509
+make[3]: *** [scripts/Makefile.build:194: mm/filemap.o] Error 1
+  AS      certs/system_certificates.o
+make[2]: *** [scripts/Makefile.build:440: mm] Error 2
+  AS      arch/x86/entry/entry.o
+  AR      certs/built-in.a
+  CC      arch/x86/entry/vdso/extable.o
+In file included from fs/notify/inotify/inotify_user.c:26:
+./include/linux/syscalls.h:34:15: error: expected identifier or ‘(’ before numeric constant
+   34 | struct pollfd;467       common  mobdev_control          sys_mobdev_control
+      |               ^~~
+  CC      arch/x86/events/amd/core.o
+In file included from arch/x86/entry/vsyscall/vsyscall_64.c:33:
+./include/linux/syscalls.h:34:15: error: expected identifier or ‘(’ before numeric constant
+   34 | struct pollfd;467       common  mobdev_control          sys_mobdev_control
+      |               ^~~
+make[3]: *** [scripts/Makefile.build:194: init/main.o] Error 1
+make[2]: *** [scripts/Makefile.build:440: init] Error 2
+  CC      fs/quota/dquot.o
+make[5]: *** [scripts/Makefile.build:194: fs/notify/inotify/inotify_user.o] Error 1
+make[4]: *** [scripts/Makefile.build:440: fs/notify/inotify] Error 2
+make[3]: *** [scripts/Makefile.build:440: fs/notify] Error 2
+make[3]: *** Waiting for unfinished jobs....
+  CC      arch/x86/events/amd/lbr.o
+  AS      arch/x86/entry/vsyscall/vsyscall_emu_64.o
+  CC      kernel/sched/fair.o
+In file included from ./include/linux/entry-common.h:7,
+                 from ./arch/x86/include/asm/idtentry.h:11,
+                 from ./arch/x86/include/asm/traps.h:9,
+                 from arch/x86/entry/vdso/extable.c:5:
+./include/linux/syscalls.h:34:15: error: expected identifier or ‘(’ before numeric constant
+   34 | struct pollfd;467       common  mobdev_control          sys_mobdev_control
+      |               ^~~
+make[5]: *** [scripts/Makefile.build:194: arch/x86/entry/vsyscall/vsyscall_64.o] Error 1
+make[4]: *** [scripts/Makefile.build:440: arch/x86/entry/vsyscall] Error 2
+make[4]: *** Waiting for unfinished jobs....
+  CC      security/keys/keyring.o
+make[5]: *** [scripts/Makefile.build:194: arch/x86/entry/vdso/extable.o] Error 1
+make[4]: *** [scripts/Makefile.build:440: arch/x86/entry/vdso] Error 2
+make[3]: *** [scripts/Makefile.build:440: arch/x86/entry] Error 2
+make[3]: *** Waiting for unfinished jobs....
+  CC      security/selinux/avc.o
+  CC      arch/x86/events/intel/core.o
+make[4]: *** [scripts/Makefile.build:194: kernel/sched/core.o] Error 1
+make[4]: *** Waiting for unfinished jobs....
+  CC      arch/x86/events/zhaoxin/core.o
+  CC      arch/x86/events/intel/bts.o
+  CC      arch/x86/events/amd/ibs.o
+In file included from ./include/linux/syscalls_api.h:1,
+                 from kernel/sched/sched.h:61,
+                 from kernel/sched/fair.c:54:
+./include/linux/syscalls.h:34:15: error: expected identifier or ‘(’ before numeric constant
+   34 | struct pollfd;467       common  mobdev_control          sys_mobdev_control
+      |               ^~~
+  AR      arch/x86/events/zhaoxin/built-in.a
+  CC      arch/x86/events/core.o
+  CC      security/keys/keyctl.o
+  CC      fs/quota/quota_v2.o
+make[4]: *** [scripts/Makefile.build:194: kernel/sched/fair.o] Error 1
+make[3]: *** [scripts/Makefile.build:440: kernel/sched] Error 2
+make[2]: *** [scripts/Makefile.build:440: kernel] Error 2
+  CC      security/selinux/hooks.o
+In file included from security/keys/keyctl.c:12:
+./include/linux/syscalls.h:34:15: error: expected identifier or ‘(’ before numeric constant
+   34 | struct pollfd;467       common  mobdev_control          sys_mobdev_control
+      |               ^~~
+  CC      security/integrity/iint.o
+  CC      fs/quota/quota_tree.o
+make[4]: *** [scripts/Makefile.build:194: security/keys/keyctl.o] Error 1
+make[3]: *** [scripts/Makefile.build:440: security/keys] Error 2
+make[3]: *** Waiting for unfinished jobs....
+  CC      arch/x86/events/amd/uncore.o
+  CC      security/integrity/integrity_audit.o
+In file included from security/selinux/hooks.c:42:
+./include/linux/syscalls.h:34:15: error: expected identifier or ‘(’ before numeric constant
+   34 | struct pollfd;467       common  mobdev_control          sys_mobdev_control
+      |               ^~~
+  CC      arch/x86/events/amd/iommu.o
+  CC      arch/x86/events/probe.o
+  CC      fs/quota/quota.o
+  AR      security/integrity/built-in.a
+  CC      security/selinux/selinuxfs.o
+  CC      arch/x86/events/intel/ds.o
+make[4]: *** [scripts/Makefile.build:194: security/selinux/hooks.o] Error 1
+make[4]: *** Waiting for unfinished jobs....
+  CC      fs/quota/kqid.o
+  CC      arch/x86/events/utils.o
+  CC      arch/x86/events/intel/knc.o
+In file included from fs/quota/quota.c:17:
+./include/linux/syscalls.h:34:15: error: expected identifier or ‘(’ before numeric constant
+   34 | struct pollfd;467       common  mobdev_control          sys_mobdev_control
+      |               ^~~
+  AR      arch/x86/events/amd/built-in.a
+  CC      arch/x86/events/rapl.o
+make[4]: *** [scripts/Makefile.build:194: fs/quota/quota.o] Error 1
+  CC      arch/x86/events/intel/lbr.o
+make[4]: *** Waiting for unfinished jobs....
+  CC      arch/x86/events/msr.o
+make[3]: *** [scripts/Makefile.build:440: fs/quota] Error 2
+make[2]: *** [scripts/Makefile.build:440: fs] Error 2
+  CC      arch/x86/events/intel/p4.o
+  CC      arch/x86/events/intel/p6.o
+  CC      arch/x86/events/intel/pt.o
+  CC      arch/x86/events/intel/uncore.o
+  CC      arch/x86/events/intel/uncore_nhmex.o
+  CC      arch/x86/events/intel/uncore_snb.o
+  CC      arch/x86/events/intel/uncore_snbep.o
+make[3]: *** [scripts/Makefile.build:440: security/selinux] Error 2
+make[2]: *** [scripts/Makefile.build:440: security] Error 2
+  CC      arch/x86/events/intel/uncore_discovery.o
+  CC      arch/x86/events/intel/cstate.o
+  AR      arch/x86/events/intel/built-in.a
+  AR      arch/x86/events/built-in.a
+make[2]: *** [scripts/Makefile.build:440: arch/x86] Error 2
+make[1]: *** [/home/user/Desktop/linux-mob_dev/Makefile:1989: .] Error 2
+make: *** [Makefile:251: __sub-make] Error 2

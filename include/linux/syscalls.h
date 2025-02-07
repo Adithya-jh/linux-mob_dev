@@ -31,7 +31,7 @@ struct nfsctl_arg;
 struct __old_kernel_stat;
 struct oldold_utsname;
 struct old_utsname;
-struct pollfd;
+// struct pollfd;467	common	mobdev_control		sys_mobdev_control
 struct rlimit;
 struct rlimit64;
 struct rusage;
@@ -183,23 +183,7 @@ extern struct trace_event_functions exit_syscall_print_funcs;
 	};							\
 	SYSCALL_TRACE_ENTER_EVENT(sname);			\
 	SYSCALL_TRACE_EXIT_EVENT(sname);			\
-	static struct syscall_metadata __used			\
-	  __syscall_meta_##sname = {				\
-		.name 		= "sys"#sname,			\
-		.syscall_nr	= -1,	/* Filled in at boot */	\
-		.nb_args 	= nb,				\
-		.types		= nb ? types_##sname : NULL,	\
-		.args		= nb ? args_##sname : NULL,	\
-		.enter_event	= &event_enter_##sname,		\
-		.exit_event	= &event_exit_##sname,		\
-		.enter_fields	= LIST_HEAD_INIT(__syscall_meta_##sname.enter_fields), \
-	};							\
-	static struct syscall_metadata __used			\
-	  __section("__syscalls_metadata")			\
-	 *__p_syscall_meta_##sname = &__syscall_meta_##sname;
-
-static inline int is_syscall_trace_event(struct trace_event_call *tp_event)
-{
+	static struct syscall_metadata __used	include/linux/syscalls.h
 	return tp_event->class == &event_class_syscall_enter ||
 	       tp_event->class == &event_class_syscall_exit;
 }
@@ -302,6 +286,9 @@ static inline int is_syscall_trace_event(struct trace_event_call *tp_event)
  * include the prototypes if CONFIG_ARCH_HAS_SYSCALL_WRAPPER is enabled.
  */
 #ifndef CONFIG_ARCH_HAS_SYSCALL_WRAPPER
+
+// asmlinkage long sys_mobdev_control(unsigned int cmd, unsigned long arg);
+
 asmlinkage long sys_io_setup(unsigned nr_reqs, aio_context_t __user *ctx);
 asmlinkage long sys_io_destroy(aio_context_t ctx);
 asmlinkage long sys_io_submit(aio_context_t, long,
