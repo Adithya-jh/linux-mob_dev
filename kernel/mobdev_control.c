@@ -37,19 +37,18 @@ static int mobdev_detect_cb(struct usb_device *udev, void *data)
     unsigned short vid = le16_to_cpu(udev->descriptor.idVendor);
     unsigned short pid = le16_to_cpu(udev->descriptor.idProduct);
 
-    /*
-     * Based on lsusb output:
-     *   Bus 001 Device 010: ID 18d1:4ee8 Google Inc. Nexus/Pixel Device (MIDI)
-     * We'll specifically match that vendor/product pair.
-     */
-    if (vid == 0x18d1 && pid == 0x4ee8) {
-        pr_info("mobdev_control: Found phone (Google) at %04x:%04x\n", vid, pid);
-        return 1; // signal “found phone” to usb_for_each_dev
+    // Print out everything we see, for debugging:
+    pr_info("mobdev_control: Checking device %04x:%04x\n", vid, pid);
+
+    // Match OnePlus NordCE 5G
+    if (vid == 0x22d9 && pid == 0x2764) {
+        pr_info("mobdev_control: Found phone (OnePlus NordCE 5G) at %04x:%04x\n", vid, pid);
+        return 1; // signal 'found device'
     }
 
-    // Otherwise, keep scanning
-    return 0;
+    return 0; // keep scanning
 }
+
 
 static long mobdev_detect_phone(void)
 {
