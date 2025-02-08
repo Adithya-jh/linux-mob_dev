@@ -102,21 +102,120 @@ static long mobdev_detect_phone(void)
     return found; // 1 => found phone, 0 => no phone
 }
 
+// -------------------------------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
+
+
+
+
 //
 // 2) FILE_TRANSFER
 //    For real usage, you'd rely on MTP or mass storage and user-space mounts.
 //    Below is just a placeholder.
 //
+
+
+
+
+
+
+static int mobdev_detect_mtp_cb(struct usb_device *udev, void *data)
+{
+    int i, j;
+
+    /*
+     * In this callback, we examine each USB device's configs and interfaces
+     * to see if any match MTP/Still Image class = 0x06 or vendor-specific 0xFF.
+     * If we find it, return 1 => "stop iteration and report found."
+     */
+
+    // Iterate over each config
+    for (i = 0; i < udev->descriptor.bNumConfigurations; i++) {
+        struct usb_host_config *cfg = &udev->config[i];
+        int num_ifs = cfg->desc.bNumInterfaces;
+
+        // For each interface in this config
+        for (j = 0; j < num_ifs; j++) {
+            struct usb_interface *intf = cfg->interface[j];
+            int alt;
+            for (alt = 0; alt < intf->num_altsetting; alt++) {
+                struct usb_interface_descriptor *idesc =
+                    &intf->altsetting[alt].desc;
+
+                /*
+                 * MTP often shows up as USB_CLASS_STILL_IMAGE (0x06),
+                 * though subClass/protocol can vary. We'll just check class.
+                 */
+                if (idesc->bInterfaceClass == USB_CLASS_STILL_IMAGE) {
+                    pr_info("mobdev_detect_mtp_cb: Found standard MTP device %04x:%04x\n",
+                        le16_to_cpu(udev->descriptor.idVendor),
+                        le16_to_cpu(udev->descriptor.idProduct));
+
+                    return 1; // Found standard MTP
+                }
+                /*
+                 * Some devices (like OnePlus) use vendor-specific class 0xFF
+                 * We check subClass = 0xFF, protocol = 0x00 to confirm.
+                 */
+                else if (idesc->bInterfaceClass == 0xFF && idesc->bInterfaceSubClass == 0xFF && idesc->bInterfaceProtocol == 0x00) {
+                    pr_info("mobdev_detect_mtp_cb: Found vendor-specific MTP device %04x:%04x\n",
+                        le16_to_cpu(udev->descriptor.idVendor),
+                        le16_to_cpu(udev->descriptor.idProduct));
+
+                    return 1; // Found vendor-specific MTP
+                }
+            }
+        }
+    }
+
+    return 0; // "Didn't find MTP in this device"
+}
+
+static int mobdev_detect_mtp(void)
+{
+    /*
+     * usb_for_each_dev(owner, callback):
+     *  - Iterates over every USB device.
+     *  - If the callback returns non-zero, iteration stops.
+     *  - The non-zero value is returned from usb_for_each_dev().
+     */
+    int found;
+    found = usb_for_each_dev(NULL, mobdev_detect_mtp_cb);
+
+    /*
+     * If found == 1, that means we found an MTP interface.
+     * If 0, no MTP device was found.
+     */
+    return found;
+}
+
+
+
 static long mobdev_file_transfer(struct mobdev_args *args)
 {
-    if (!args->path[0]) {
-        pr_err("mobdev_control: No path specified for file transfer\n");
-        return -EINVAL;
+    int ret = mobdev_detect_mtp();
+    if (ret == 1) {
+        pr_info("mobdev_control: MTP device present, user-space should do actual file copy.\n");
+        return 0; // success
+    } else {
+        pr_err("mobdev_control: No MTP device found.\n");
+        return -ENODEV;
     }
-    pr_info("mobdev_control: (Stub) file transfer to/from: %s\n", args->path);
-    // Real logic for MTP or block device mount would be far more complex.
-    return 0;
 }
+
+
+
+
+
+
+
+// -------------------------------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
+
+
+
 
 //
 // 3) TETHERING
@@ -219,6 +318,7 @@ SYSCALL_DEFINE2(mobdev_control,
         pr_info("mobdev_control: FILE_TRANSFER command\n");
         ret = mobdev_file_transfer(&kargs);
         break;
+
 
     case MOBDEV_TETHERING:
         pr_info("mobdev_control: TETHERING command\n");
