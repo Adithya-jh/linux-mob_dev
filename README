@@ -21,3 +21,16 @@ updation tests
 
 upgrade 1:
 updated the template. added the syscall , (not the implementation)
+
+
+upgrade 2:
+Done with mobile detection and done with usb tethering.
+changed the configuration for Device Drivers  --->
+  Network device support  --->
+    USB Network Adapters  --->
+       Multi-purpose USB Networking Framework (USBNET)
+       CDC Ethernet support (CDC_ETHER)
+       RNDIS support (rndis_host)
+in the menuconfig.
+
+
