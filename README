@@ -34,3 +34,7 @@ changed the configuration for Device Drivers  --->
 in the menuconfig.
 
 
+upgrade 3:
+Cant natively send and upload the files -> fuse3 is not enabling in the kernal.
+so using external module -> adb for file transfer.
+Added the tranfer functionality using abd -> both push and pull.
