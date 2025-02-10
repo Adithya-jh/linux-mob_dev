@@ -38,3 +38,9 @@ upgrade 3:
 Cant natively send and upload the files -> fuse3 is not enabling in the kernal.
 so using external module -> adb for file transfer.
 Added the tranfer functionality using abd -> both push and pull.
+
+upgrade 4:
+tried to implement the call functionality. couldnt complete. 
+first tried with bluetooth bluez, -> problem with configuration.
+next tried with adb -> problem with communication between CLI and Kernal.
+
