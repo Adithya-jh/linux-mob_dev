@@ -44,3 +44,7 @@ tried to implement the call functionality. couldnt complete.
 first tried with bluetooth bluez, -> problem with configuration.
 next tried with adb -> problem with communication between CLI and Kernal.
 
+
+upgrade 5:
+almost completed call and volume functionality. [not yet working]
+config/permission problem.
