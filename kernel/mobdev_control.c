@@ -13,13 +13,28 @@
 #include <linux/skbuff.h>
 #include <linux/kmod.h>       // For call_usermodehelper()
 #include <linux/module.h>
-
-// Include netlink socket functions
 #include <net/netlink.h>
 #include <net/sock.h>
 
+/* Define our Netlink protocol number */
+#define NETLINK_MOBDEV 31
+
+/* Generic Netlink message structure used for IPC */
+struct mobdev_netlink_msg {
+    int type;   // 1 = volume, 2 = screen mirror, 3 = screenshot
+    int value;  // For type 1: volume (1 = up, 0 = down);
+                // For type 2: mirror (1 = start, 0 = stop);
+                // For type 3: flag (always 1)
+};
+
+/* Global Netlink socket */
+static struct sock *mobdev_nl_sk = NULL;
+
+/* Prototype for our helper function */
+static int send_netlink_msg(struct mobdev_netlink_msg *msg);
+
 /*
- * Example command IDs
+ * Example command IDs (must match with user space)
  */
 enum mobdev_cmd {
     MOBDEV_DETECT = 0,
@@ -28,21 +43,24 @@ enum mobdev_cmd {
     MOBDEV_NOTIFICATIONS,
     MOBDEV_CALL_CONTROL,
     MOBDEV_MEDIA_CONTROL,
-    MOBDEV_SCREENSHOT
+    MOBDEV_SCREENSHOT,
+    MOBDEV_SCREEN_MIRROR
 };
 
 /*
- * This struct can be passed in from user space for commands requiring extra args
+ * Structure for arguments passed from user space.
  */
 struct mobdev_args {
-    int  enable;       // 1 = push, 0 = pull
-    char path[128];    // File path for transfer
-    char ifname[32];   // Interface name for tethering
-    int action;
+    int  enable;       // For transfer: 1 = push, 0 = pull.
+                       // For mirror: 1 = start, 0 = stop.
+                       // For volume: 1 = up, 0 = down.
+    char path[128];    // For file transfer.
+    char ifname[32];   // For tethering.
+    int action;        // For volume.
 };
 
 /*
- * 1) DETECT: Scan USB devices to check for phones
+ * 1) DETECT: Scan USB devices to check for phones.
  */
 static int mobdev_detect_cb(struct usb_device *udev, void *data)
 {
@@ -51,29 +69,22 @@ static int mobdev_detect_cb(struct usb_device *udev, void *data)
     int cfg_index, if_index;
 
     pr_info("mobdev_control: Checking device %04x:%04x\n", vid, pid);
-
     for (cfg_index = 0; cfg_index < udev->descriptor.bNumConfigurations; cfg_index++) {
         struct usb_host_config *cfg = &udev->config[cfg_index];
-
         for (if_index = 0; if_index < cfg->desc.bNumInterfaces; if_index++) {
             struct usb_interface *interface = cfg->interface[if_index];
-
             for (int alt_index = 0; alt_index < interface->num_altsetting; alt_index++) {
                 struct usb_interface_descriptor *intf_desc = &interface->altsetting[alt_index].desc;
-
                 switch (intf_desc->bInterfaceClass) {
-                case USB_CLASS_STILL_IMAGE: // 0x06 (MTP/PTP)
+                case USB_CLASS_STILL_IMAGE:
                     pr_info("mobdev_control: Detected MTP/PTP device\n");
                     return 1;
-
-                case USB_CLASS_WIRELESS_CONTROLLER: // 0xE0 (RNDIS tethering)
+                case USB_CLASS_WIRELESS_CONTROLLER:
                     pr_info("mobdev_control: Detected RNDIS device\n");
                     return 1;
-
-                case USB_CLASS_VENDOR_SPEC: // 0xFF (vendor-specific, common on Android)
+                case USB_CLASS_VENDOR_SPEC:
                     pr_info("mobdev_control: Detected vendor-specific device\n");
                     return 1;
-
                 default:
                     break;
                 }
@@ -89,7 +100,7 @@ static long mobdev_detect_phone(void)
 }
 
 /*
- * 2) FILE_TRANSFER: Uses ADB to transfer files
+ * 2) FILE_TRANSFER: Uses ADB to transfer files.
  */
 static long mobdev_file_transfer(struct mobdev_args *args)
 {
@@ -99,13 +110,11 @@ static long mobdev_file_transfer(struct mobdev_args *args)
 
     if (ret == 1) {
         pr_info("mobdev_control: Phone detected, initiating ADB file transfer.\n");
-
         argv[0] = "/usr/bin/adb";
-        argv[1] = args->enable ? "push" : "pull"; // 1 = push, 0 = pull
+        argv[1] = args->enable ? "push" : "pull";
         argv[2] = args->path;
         argv[3] = args->enable ? "/sdcard/" : "/home/user/";
         argv[4] = NULL;
-
         ret = call_usermodehelper(argv[0], argv, envp, UMH_WAIT_PROC);
         if (ret < 0) {
             pr_err("mobdev_control: ADB transfer failed.\n");
@@ -120,7 +129,7 @@ static long mobdev_file_transfer(struct mobdev_args *args)
 }
 
 /*
- * 3) TETHERING: Controls USB network interfaces
+ * 3) TETHERING: Controls USB network interfaces.
  */
 static long mobdev_tethering(struct mobdev_args *args)
 {
@@ -129,7 +138,6 @@ static long mobdev_tethering(struct mobdev_args *args)
 
     ifname[0] = '\0';
     strncpy(ifname, args->ifname, sizeof(ifname) - 1);
-
     rtnl_lock();
     ndev = dev_get_by_name(&init_net, ifname);
     if (!ndev) {
@@ -137,7 +145,6 @@ static long mobdev_tethering(struct mobdev_args *args)
         rtnl_unlock();
         return -ENODEV;
     }
-
     if (args->enable) {
         if (!(ndev->flags & IFF_UP)) {
             pr_info("mobdev_control: Bringing '%s' up\n", ifname);
@@ -155,14 +162,13 @@ static long mobdev_tethering(struct mobdev_args *args)
 }
 
 /*
- * 4) NOTIFICATIONS: Simulates notifications from phone
+ * 4) NOTIFICATIONS: Simulates notifications from phone.
  */
 static bool notifications_enabled = false;
 static void send_fake_notification_to_userspace(void)
 {
     pr_info("mobdev_control: Sending fake notification to user space\n");
 }
-
 static long mobdev_notifications(struct mobdev_args *args)
 {
     if (args->enable && !notifications_enabled) {
@@ -179,7 +185,7 @@ static long mobdev_notifications(struct mobdev_args *args)
 }
 
 /*
- * 5) CALL CONTROL: Detect & answer/reject calls via ADB
+ * 5) CALL CONTROL: Detect & answer/reject calls via ADB.
  */
 static long mobdev_call_control(struct mobdev_args *args)
 {
@@ -189,15 +195,12 @@ static long mobdev_call_control(struct mobdev_args *args)
     char *adb_reject_call[] = { "/usr/bin/adb", "shell", "input", "keyevent", "KEYCODE_ENDCALL", NULL };
 
     pr_info("mobdev_control: Checking for incoming calls...\n");
-
     int ret = call_usermodehelper(adb_check_call[0], adb_check_call, envp, UMH_WAIT_PROC);
     if (ret < 0) {
         pr_err("mobdev_control: Failed to check call state.\n");
         return -EIO;
     }
-
     pr_info("mobdev_control: Incoming call detected!\n");
-
     char **adb_action = args->action ? adb_answer_call : adb_reject_call;
     ret = call_usermodehelper(adb_action[0], adb_action, envp, UMH_WAIT_PROC);
     if (ret < 0) {
@@ -209,24 +212,80 @@ static long mobdev_call_control(struct mobdev_args *args)
 }
 
 /*
- * 6) MEDIA CONTROL: Volume up/down using Netlink IPC to trigger user-space ADB commands
+ * 6) MEDIA CONTROL: Volume up/down using Netlink IPC.
+ * (Type 1 for volume: value 1 for up, 0 for down)
  */
-
-/* Netlink definitions */
-#define NETLINK_MOBDEV 31
-static struct sock *mobdev_nl_sk = NULL;
-
-/* Marking as __maybe_unused to avoid warnings if not used in this file */
-static void __maybe_unused mobdev_nl_recv_msg(struct sk_buff *skb)
+static long mobdev_media_control(struct mobdev_args *args)
 {
-    pr_info("mobdev_control: Received netlink message (unused).\n");
+    struct mobdev_netlink_msg msg;
+    if (!mobdev_detect_phone()) {
+        pr_err("mobdev_control: No phone detected for media volume control.\n");
+        return -ENODEV;
+    }
+    msg.type = 1;
+    msg.value = (args->action == 1) ? 1 : 0;
+    pr_info("mobdev_control: Received volume command: %s\n", (msg.value == 1) ? "up" : "down");
+    if (send_netlink_msg(&msg) < 0) {
+         pr_err("mobdev_control: Failed to send netlink message for volume control.\n");
+         return -EIO;
+    }
+    pr_info("mobdev_control: Volume command sent to user space via netlink.\n");
+    return 0;
 }
 
-static int send_volume_netlink_msg(int vol_cmd)
+/*
+ * 7) SCREENSHOT: Trigger screenshot via Netlink IPC.
+ * (Type 3 for screenshot; value is a flag.)
+ */
+static long mobdev_screenshot(void)
+{
+    struct mobdev_netlink_msg msg;
+    int ret = mobdev_detect_phone();
+    if (ret != 1) {
+        pr_err("mobdev_control: No phone detected.\n");
+        return -ENODEV;
+    }
+    msg.type = 3;
+    msg.value = 1; // Flag value
+    pr_info("mobdev_control: Sending screenshot command via netlink IPC.\n");
+    if (send_netlink_msg(&msg) < 0) {
+         pr_err("mobdev_control: Failed to send netlink message for screenshot.\n");
+         return -EIO;
+    }
+    pr_info("mobdev_control: Screenshot command sent to user space via netlink.\n");
+    return 0;
+}
+
+/*
+ * 8) SCREEN MIRRORING: Trigger screen mirroring via Netlink IPC.
+ * (Type 2 for screen mirroring; value: 1 = start, 0 = stop)
+ */
+static long mobdev_screen_mirror(struct mobdev_args *args)
+{
+    struct mobdev_netlink_msg msg;
+    if (!mobdev_detect_phone()) {
+        pr_err("mobdev_control: No phone detected for screen mirroring.\n");
+        return -ENODEV;
+    }
+    msg.type = 2;
+    msg.value = args->action; // 1 = start, 0 = stop
+    pr_info("mobdev_control: Received screen mirror command: %s\n", (msg.value == 1) ? "start" : "stop");
+    if (send_netlink_msg(&msg) < 0) {
+         pr_err("mobdev_control: Failed to send netlink message for screen mirroring.\n");
+         return -EIO;
+    }
+    pr_info("mobdev_control: Screen mirror command sent to user space via netlink.\n");
+    return 0;
+}
+
+/*
+ * Generic function to send a Netlink message.
+ */
+static int send_netlink_msg(struct mobdev_netlink_msg *msg)
 {
     struct sk_buff *skb_out;
     struct nlmsghdr *nlh;
-    int msg_size = sizeof(int);
+    int msg_size = sizeof(struct mobdev_netlink_msg);
     int res;
 
     skb_out = nlmsg_new(msg_size, GFP_KERNEL);
@@ -239,7 +298,7 @@ static int send_volume_netlink_msg(int vol_cmd)
          kfree_skb(skb_out);
          return -ENOMEM;
     }
-    memcpy(nlmsg_data(nlh), &vol_cmd, sizeof(int));
+    memcpy(nlmsg_data(nlh), msg, msg_size);
     NETLINK_CB(skb_out).dst_group = 1; /* Multicast group 1 */
     res = nlmsg_multicast(mobdev_nl_sk, skb_out, 0, 1, GFP_KERNEL);
     if (res < 0) {
@@ -253,81 +312,13 @@ static int send_volume_netlink_msg(int vol_cmd)
     return 0;
 }
 
-
-static long mobdev_media_control(struct mobdev_args *args)
-{
-    int vol_cmd;
-
-    if (!mobdev_detect_phone()) {
-        pr_err("mobdev_control: No phone detected for media volume control.\n");
-        return -ENODEV;
-    }
-    /* Use action=1 for volume up and 0 for volume down */
-    vol_cmd = (args->action == 1) ? 1 : 0;
-    pr_info("mobdev_control: Received volume command: %s\n", (vol_cmd == 1) ? "up" : "down");
-
-    if (send_volume_netlink_msg(vol_cmd) < 0) {
-         pr_err("mobdev_control: Failed to send netlink message for volume control.\n");
-         return -EIO;
-    }
-    pr_info("mobdev_control: Volume command sent to user space via netlink.\n");
-    return 0;
-}
-
 /*
- * 7) SCREENSHOT: Uses ADB to capture and pull a screenshot
- */
-static long mobdev_screenshot(void)
-{
-    int ret;
-    char *envp[] = {
-        "HOME=/",
-        "PATH=/sbin:/usr/sbin:/bin:/usr/bin",
-        "LD_LIBRARY_PATH=/usr/lib:/lib",
-        NULL
-    };
-    char *adb_screencap[] = { "/usr/bin/adb", "shell", "screencap", "/sdcard/screenshot.png", NULL };
-    char *adb_pull[]      = { "/usr/bin/adb", "pull", "/sdcard/screenshot.png", "/home/user/Desktop/screenshot.png", NULL };
-    char *adb_rm[]        = { "/usr/bin/adb", "shell", "rm", "/sdcard/screenshot.png", NULL };
-
-    pr_info("mobdev_control: Checking if phone is connected...\n");
-    ret = mobdev_detect_phone();
-    if (ret != 1) {
-        pr_err("mobdev_control: No phone detected.\n");
-        return -ENODEV;
-    }
-    pr_info("mobdev_control: Phone detected, capturing screenshot via ADB.\n");
-    ret = call_usermodehelper(adb_screencap[0], adb_screencap, envp, UMH_WAIT_PROC);
-    pr_info("mobdev_control: Screenshot capture returned %d\n", ret);
-    if (ret < 0) {
-        pr_err("mobdev_control: ADB screenshot failed.\n");
-        return -EIO;
-    }
-    pr_info("mobdev_control: Pulling screenshot to Desktop...\n");
-    ret = call_usermodehelper(adb_pull[0], adb_pull, envp, UMH_WAIT_PROC);
-    pr_info("mobdev_control: Screenshot pull returned %d\n", ret);
-    if (ret < 0) {
-        pr_err("mobdev_control: ADB pull failed.\n");
-        return -EIO;
-    }
-    pr_info("mobdev_control: Deleting screenshot from phone...\n");
-    ret = call_usermodehelper(adb_rm[0], adb_rm, envp, UMH_WAIT_PROC);
-    pr_info("mobdev_control: Screenshot remove returned %d\n", ret);
-    if (ret < 0) {
-        pr_err("mobdev_control: ADB remove failed.\n");
-        return -EIO;
-    }
-    pr_info("mobdev_control: Screenshot successfully captured and saved at /home/user/Desktop/screenshot.png!\n");
-    return 0;
-}
-
-/*
- * Netlink initialization and exit functions
+ * Netlink initialization and exit functions.
  */
 static int mobdev_nl_init(void)
 {
     struct netlink_kernel_cfg cfg = {
-        .input = mobdev_nl_recv_msg,
+        .input = NULL,  // Not used in this module.
     };
 
     mobdev_nl_sk = netlink_kernel_create(&init_net, NETLINK_MOBDEV, &cfg);
@@ -346,7 +337,7 @@ static void mobdev_nl_exit(void)
 }
 
 /*
- * System Call Handler
+ * System Call Handler.
  */
 SYSCALL_DEFINE2(mobdev_control,
                 unsigned int, cmd,
@@ -360,7 +351,8 @@ SYSCALL_DEFINE2(mobdev_control,
          cmd == MOBDEV_NOTIFICATIONS ||
          cmd == MOBDEV_CALL_CONTROL ||
          cmd == MOBDEV_MEDIA_CONTROL ||
-         cmd == MOBDEV_SCREENSHOT) && arg != 0)
+         cmd == MOBDEV_SCREENSHOT    ||
+         cmd == MOBDEV_SCREEN_MIRROR) && arg != 0)
     {
         if (copy_from_user(&kargs, (struct mobdev_args __user *)arg, sizeof(kargs))) {
             pr_err("mobdev_control: Failed to copy args from user\n");
@@ -389,8 +381,12 @@ SYSCALL_DEFINE2(mobdev_control,
         ret = mobdev_media_control(&kargs);
         break;
     case MOBDEV_SCREENSHOT:
-        pr_info("mobdev_control: SCREENSHOT command (ADB-based screenshot & pull).\n");
+        pr_info("mobdev_control: SCREENSHOT command (Netlink-based).\n");
         ret = mobdev_screenshot();
+        break;
+    case MOBDEV_SCREEN_MIRROR:
+        pr_info("mobdev_control: SCREEN_MIRROR command (Netlink-based).\n");
+        ret = mobdev_screen_mirror(&kargs);
         break;
     default:
         pr_err("mobdev_control: Unknown command %u\n", cmd);
