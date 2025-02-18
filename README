@@ -48,3 +48,12 @@ next tried with adb -> problem with communication between CLI and Kernal.
 upgrade 5:
 almost completed call and volume functionality. [not yet working]
 config/permission problem.
+
+Final upgrade:
+
+Implemented Call answer and reject functionality.
+Implemented Volume up and down.
+Implemented Screen Mirroring
+Implemented Screenshot
+
+current version - v6.13.3- ......1f4
